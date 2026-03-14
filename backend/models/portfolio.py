@@ -26,6 +26,7 @@ class Holding(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     portfolio_id = Column(UUID(as_uuid=True), ForeignKey("portfolios.id"), nullable=False)
     ticker = Column(String, nullable=False)
+    currency = Column(String, nullable=True)
     shares = Column(Float)
     market_value = Column(Float)
     avg_buy_price = Column(Float)

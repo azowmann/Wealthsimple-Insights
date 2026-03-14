@@ -2,33 +2,21 @@ import cv2
 import pytesseract
 import numpy as np
 import re
-from PIL import Image
-import io
 
-# Point pytesseract at the Tesseract binary on Windows
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+
 def preprocess_image(image_bytes: bytes) -> np.ndarray:
-    """
-    Convert raw image bytes into a cleaned, high-contrast grayscale image
-    that Tesseract can read accurately.
-    """
-    # Decode bytes into a numpy array OpenCV can work with
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-    # Convert to grayscale — Tesseract works best on grayscale images
+    h, w = img.shape[:2]
+    img = img[:, int(w * 0.12):]
+
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Upscale the image — Tesseract accuracy improves significantly on
-    # larger text. 2x scaling is a reliable general boost.
-    scaled = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-
-    # Apply mild blur to reduce noise before thresholding
+    scaled = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
     blurred = cv2.GaussianBlur(scaled, (3, 3), 0)
 
-    # Adaptive thresholding converts the image to pure black and white.
-    # This handles uneven lighting and makes text pop cleanly.
     thresh = cv2.adaptiveThreshold(
         blurred, 255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -36,66 +24,102 @@ def preprocess_image(image_bytes: bytes) -> np.ndarray:
         11, 2
     )
 
+    cv2.imwrite("debug_processed.png", thresh)
+
     return thresh
 
-def extract_text(image_bytes: bytes) -> str:
-    """
-    Run Tesseract OCR on the preprocessed image and return raw text.
-    """
-    processed = preprocess_image(image_bytes)
+def clean_text(raw_text: str) -> str:
+    text = re.sub(r'(?<!\w)S\$', '$', raw_text)
+    text = re.sub(r'(?<=[+\-])S', '$', text)
+    text = re.sub(r'=\$', '-$', text)
 
-    # PSM 6 tells Tesseract to treat the image as a single uniform block of text.
-    # This works well for list-style layouts like the Wealthsimple holdings page.
+    # Fix dropped decimals in dollar amounts — e.g. "$6712" when it should be "$67.12"
+    # Pattern: dollar amount with no decimal followed by exactly 2 digits at end of number
+    # This specifically catches 4-digit amounts that should be 2+2
+    def fix_decimal(match):
+        amount = match.group(1)
+        # If 4 digits with no decimal, insert decimal after first 2
+        if re.match(r'^\d{4}$', amount):
+            return f'${amount[:2]}.{amount[2:]}'
+        return match.group(0)
+
+    text = re.sub(r'\$([\d]+)(?=\s)', fix_decimal, text)
+
+    text = text.replace('—', '-').replace('–', '-')
+
+    lines = [line.upper() for line in text.split('\n')]
+    return '\n'.join(lines)
+
+
+def extract_text(image_bytes: bytes) -> str:
+    processed = preprocess_image(image_bytes)
     custom_config = r"--oem 3 --psm 6"
     raw_text = pytesseract.image_to_string(processed, config=custom_config)
-
     return raw_text
+
 
 def parse_holdings(raw_text: str) -> list[dict]:
     """
-    Parse raw OCR text into a structured list of holdings.
-    Each holding is a dictionary with ticker, shares, market_value,
-    currency, gain_loss_dollar, and gain_loss_pct.
+    Parse cleaned OCR text into structured holdings.
+    Strategy: scan every line for each data type independently
+    rather than assuming a fixed line order.
     """
-    holdings = []
-    lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
+    cleaned = clean_text(raw_text)
+    lines = [line.strip() for line in cleaned.split('\n') if line.strip()]
 
+    print("--- CLEANED LINES ---")
+    for line in lines:
+        print(repr(line))
+    print("---------------------")
+
+    # Known tickers we expect — used as an anchor for parsing
+    # This is a fallback safety net alongside the regex
+    holdings = []
     i = 0
+
     while i < len(lines):
         line = lines[i]
 
-        # Match a ticker — 2 to 5 uppercase letters on their own line
-        ticker_match = re.match(r"^([A-Z]{2,5})$", line)
+        # Match a ticker — 2 to 5 uppercase letters, alone on a line
+        # OR at the start of a line followed by a space and dollar amount
+        ticker_match = re.match(r'^([A-Z]{2,5})(?:\s|$)', line)
 
         if ticker_match:
             ticker = ticker_match.group(1)
+
+            # Skip non-ticker words that happen to be all caps
+            skip_words = {"CAD", "USD", "ETF", "ETFS", "SORT", "STOCKS", "HOLDINGS", "TOTAL"}
+            if ticker in skip_words:
+                i += 1
+                continue
+
             holding = {"ticker": ticker}
 
-            # Look ahead through the next few lines to find the associated data
-            for j in range(i + 1, min(i + 5, len(lines))):
-                next_line = lines[j]
+            # Search this line and the next 4 lines for associated data
+            search_lines = lines[i:min(i + 5, len(lines))]
+            combined = ' '.join(search_lines)
 
-                # Match shares — e.g. "28.3086 shares" or "10 shares"
-                shares_match = re.search(r"([\d,]+\.?\d*)\s+shares", next_line)
-                if shares_match and "shares" not in holding:
-                    holding["shares"] = float(shares_match.group(1).replace(",", ""))
+            # Shares — e.g. "28.3086 SHARES" or "10 SHARES"
+            shares_match = re.search(r'([\d]+\.?\d*)\s+SHA', combined)
+            if shares_match:
+                holding["shares"] = float(shares_match.group(1).replace(',', ''))
 
-                # Match market value — e.g. "$4,664.41 CAD" or "$182.92 USD"
-                value_match = re.search(r"\$([\d,]+\.?\d*)\s+(CAD|USD)", next_line)
-                if value_match and "market_value" not in holding:
-                    holding["market_value"] = float(value_match.group(1).replace(",", ""))
-                    holding["currency"] = value_match.group(2)
+            # Market value — e.g. "$4,664.41 CAD" or "$182.92 USD"
+            value_match = re.search(r'\$([\d,]+\.?\d*)\s+(CAD|USD)', combined)
+            if value_match:
+                holding["market_value"] = float(value_match.group(1).replace(',', ''))
+                holding["currency"] = value_match.group(2)
 
-                # Match gain/loss — e.g. "+$826.66 (+21.54%)" or "-$16.78 (-8.40%)"
-                gain_match = re.search(
-                    r"([+-])\$([\d,]+\.?\d*)\s+\(([+-][\d.]+)%\)", next_line
-                )
-                if gain_match and "gain_loss_pct" not in holding:
-                    sign = 1 if gain_match.group(1) == "+" else -1
-                    holding["gain_loss_dollar"] = sign * float(gain_match.group(2).replace(",", ""))
-                    holding["gain_loss_pct"] = float(gain_match.group(3))
+            # Gain/loss — e.g. "+$826.66 (+21.54%)" or "-$16.78 (-8.40%)"
+            # Also handles OCR noise like "+$826.66 (+ 21.54%)."
+            gain_match = re.search(
+    r'([+-])\s*\$?([\d,]+\.?\d*)\s*\(\s*[+-]\s*([\d.]+)%\s*\)', combined
+)
+            if gain_match:
+                sign = 1 if gain_match.group(1) == '+' else -1
+                holding["gain_loss_dollar"] = sign * float(gain_match.group(2).replace(',', ''))
+                holding["gain_loss_pct"] = sign * float(gain_match.group(3))
 
-            # Only add holding if we captured at least the ticker and value
             if "market_value" in holding:
                 holdings.append(holding)
 
@@ -103,11 +127,8 @@ def parse_holdings(raw_text: str) -> list[dict]:
 
     return holdings
 
+
 def process_screenshot(image_bytes: bytes) -> list[dict]:
-    """
-    Main entry point for the OCR service.
-    Takes raw image bytes, returns a clean list of parsed holdings.
-    """
     raw_text = extract_text(image_bytes)
     print("--- RAW OCR TEXT ---")
     print(raw_text)
