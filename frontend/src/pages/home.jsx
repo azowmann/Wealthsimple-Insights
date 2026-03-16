@@ -147,10 +147,12 @@ const styles = {
         maxWidth: "560px",
         margin: "0 auto",
         width: "100%",
+        textAlign: "center",
     },
     hero: {
         textAlign: "center",
         marginBottom: "48px",
+        width: "100%",
     },
     eyebrow: {
         fontSize: "12px",
@@ -161,7 +163,7 @@ const styles = {
         marginBottom: "16px",
     },
     headline: {
-        fontSize: "clamp(36px, 6vw, 52px)",
+        fontSize: "clamp(48px, 8vw, 72px)",
         lineHeight: "1.1",
         letterSpacing: "-0.03em",
         color: "var(--text-primary)",
