@@ -133,7 +133,7 @@ const styles = {
     },
     wordmark: {
         fontFamily: "var(--font-serif)",
-        fontSize: "20px",
+        fontSize: "35px",
         letterSpacing: "-0.03em",
         color: "var(--text-primary)",
     },
