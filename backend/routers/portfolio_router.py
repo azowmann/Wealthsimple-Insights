@@ -5,10 +5,10 @@ from backend.models.portfolio import Portfolio, Holding, Metrics
 from backend.services.ocr_service import process_screenshot
 from backend.services.enrichment_service import enrich_holdings
 from backend.services.metrics_service import compute_metrics
+from backend.services.ai_service import generate_portfolio_analysis
 import uuid
 
 router = APIRouter()
-
 
 @router.post("/upload")
 async def upload_portfolio(
@@ -69,8 +69,16 @@ async def upload_portfolio(
 
     db.flush()
 
-    # Compute metrics
+    # Compute quantitative metrics
     metrics_data = compute_metrics(holding_objects, enrichment_results)
+
+    # Generate AI analysis — runs after metrics so Claude has full context.
+    # Wrapped in try/except so a Claude API hiccup never fails the whole upload.
+    try:
+        ai_analysis = generate_portfolio_analysis(holding_objects, metrics_data)
+    except Exception as e:
+        print(f"[AI SERVICE ERROR] {e}")
+        ai_analysis = None
 
     metrics = Metrics(
         id=uuid.uuid4(),
@@ -79,7 +87,8 @@ async def upload_portfolio(
         portfolio_beta=metrics_data["portfolio_beta"],
         max_drawdown=metrics_data["max_drawdown"],
         sector_data=metrics_data["sector_data"],
-        correlation=metrics_data["correlation"]
+        correlation=metrics_data["correlation"],
+        ai_analysis=ai_analysis,
     )
     db.add(metrics)
 
@@ -92,6 +101,7 @@ async def upload_portfolio(
         "status": portfolio.status,
         "holdings_extracted": len(parsed_holdings),
         "metrics": metrics_data,
+        "ai_analysis": ai_analysis,
         "holdings": [
             {
                 "ticker": r["ticker"],
