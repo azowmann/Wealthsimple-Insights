@@ -22,5 +22,6 @@ def get_metrics(portfolio_id: UUID, db: Session = Depends(get_db)):
         "max_drawdown": metrics.max_drawdown,
         "sector_data": metrics.sector_data,
         "correlation": metrics.correlation,
+        "ai_analysis": metrics.ai_analysis,   # <-- new field
         "computed_at": metrics.computed_at,
     }
