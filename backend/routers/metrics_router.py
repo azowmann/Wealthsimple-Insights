@@ -6,7 +6,6 @@ from uuid import UUID
 
 router = APIRouter()
 
-
 @router.get("/{portfolio_id}")
 def get_metrics(portfolio_id: UUID, db: Session = Depends(get_db)):
     metrics = db.query(Metrics).filter(
@@ -22,6 +21,6 @@ def get_metrics(portfolio_id: UUID, db: Session = Depends(get_db)):
         "max_drawdown": metrics.max_drawdown,
         "sector_data": metrics.sector_data,
         "correlation": metrics.correlation,
-        "ai_analysis": metrics.ai_analysis,   # <-- new field
+        "ai_analysis": metrics.ai_analysis,
         "computed_at": metrics.computed_at,
     }

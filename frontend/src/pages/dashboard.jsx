@@ -5,6 +5,7 @@ import MetricsCard from "../components/MetricsCard";
 import SectorChart from "../components/SectorChart";
 import HoldingsTable from "../components/HoldingsTable";
 import CorrelationHeatmap from "../components/CorrelationHeatmap";
+import AIAnalysis from "../components/AIAnalysis";
 
 export default function Dashboard() {
     const { portfolioId } = useParams();
@@ -36,8 +37,15 @@ export default function Dashboard() {
         <div style={{ padding: "40px", maxWidth: "1100px", margin: "0 auto" }}>
             <h1>Portfolio Dashboard</h1>
 
+            {/* AI Analysis — shown first so it frames the data below */}
+            {metrics?.ai_analysis && (
+                <div style={{ marginTop: "32px" }}>
+                    <AIAnalysis analysis={metrics.ai_analysis} />
+                </div>
+            )}
+
             {/* Metrics Cards */}
-            <div style={{ display: "flex", gap: "16px", marginTop: "32px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "16px", marginTop: "40px", flexWrap: "wrap" }}>
                 <MetricsCard label="Sharpe Ratio" value={metrics?.sharpe_ratio} />
                 <MetricsCard label="Portfolio Beta" value={metrics?.portfolio_beta} />
                 <MetricsCard label="Max Drawdown" value={`${metrics?.max_drawdown}%`} />
