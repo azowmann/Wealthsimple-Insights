@@ -5,81 +5,64 @@ export default function AIAnalysis({ analysis }) {
 
     const scoreColor =
         health_score >= 8 ? "var(--green)" :
-            health_score >= 5 ? "#F59E0B" :
+            health_score >= 5 ? "#D97706" :
                 "var(--red)";
 
     const scoreLabel =
         health_score >= 8 ? "Strong" :
             health_score >= 6 ? "Moderate" :
-                health_score >= 4 ? "Weak" :
-                    "Poor";
+                health_score >= 4 ? "Weak" : "Poor";
 
     return (
         <div style={styles.wrapper}>
-            {/* Header row */}
-            <div style={styles.header}>
-                <div>
+            {/* Top row: title + score badge */}
+            <div style={styles.topRow}>
+                <div style={styles.titleBlock}>
                     <p style={styles.eyebrow}>AI Analysis</p>
                     <h2 style={styles.title}>Portfolio Health</h2>
                 </div>
+
                 {health_score != null && (
-                    <div style={styles.scoreRing}>
-                        <span style={{ ...styles.scoreNumber, color: scoreColor }}>
+                    <div style={{ ...styles.scoreBadge, borderColor: scoreColor }}>
+                        <span style={{ ...styles.scoreNum, color: scoreColor }}>
                             {health_score}
                         </span>
-                        <span style={styles.scoreDenom}>/10</span>
-                        <span style={{ ...styles.scoreLabel, color: scoreColor }}>
+                        <span style={styles.scoreSuffix}>/10</span>
+                        <span style={{ ...styles.scoreTag, color: scoreColor }}>
                             {scoreLabel}
                         </span>
                     </div>
                 )}
             </div>
 
-            {/* Health summary */}
+            {/* Summary */}
             {health_summary && (
                 <p style={styles.summary}>{health_summary}</p>
             )}
 
-            {/* Three columns: strengths / risks / recommendations */}
-            <div style={styles.grid}>
-                <Section
-                    title="Strengths"
-                    items={strengths}
-                    icon="↑"
-                    iconColor="var(--green)"
-                    iconBg="var(--green-bg)"
-                />
-                <Section
-                    title="Risk Flags"
-                    items={risk_flags}
-                    icon="!"
-                    iconColor="var(--red)"
-                    iconBg="var(--red-bg)"
-                />
-                <Section
-                    title="Recommendations"
-                    items={recommendations}
-                    icon="→"
-                    iconColor="#6B6B6B"
-                    iconBg="#F0EFE9"
-                />
+            {/* Divider */}
+            <div style={styles.divider} />
+
+            {/* Three columns */}
+            <div style={styles.cols}>
+                <Column title="Strengths" items={strengths} accent="var(--green)" marker="+" />
+                <Column title="Risk Flags" items={risk_flags} accent="var(--red)" marker="!" />
+                <Column title="Recommendations" items={recommendations} accent="var(--text-muted)" marker="→" />
             </div>
         </div>
     );
 }
 
-function Section({ title, items, icon, iconColor, iconBg }) {
+function Column({ title, items, accent, marker }) {
     if (!items?.length) return null;
     return (
-        <div style={styles.section}>
-            <p style={styles.sectionTitle}>{title}</p>
-            <ul style={styles.list}>
+        <div style={colStyles.col}>
+            <p style={colStyles.title}>{title}</p>
+            <ul style={colStyles.list}>
                 {items.map((item, i) => (
-                    <li key={i} style={styles.listItem}>
-                        <span style={{ ...styles.bullet, color: iconColor, background: iconBg }}>
-                            {icon}
-                        </span>
-                        <span style={styles.itemText}>{item}</span>
+                    <li key={i} style={colStyles.item}>
+                        <span style={{ ...colStyles.marker, color: accent }}>{marker}</span>
+                        <span style={colStyles.text}>{item}</span>
                     </li>
                 ))}
             </ul>
@@ -90,106 +73,108 @@ function Section({ title, items, icon, iconColor, iconBg }) {
 const styles = {
     wrapper: {
         background: "var(--bg-card)",
-        border: "1px solid var(--border)",
+        border: "1px solid var(--border-light)",
         borderRadius: "var(--radius)",
-        padding: "32px",
+        padding: "36px",
     },
-    header: {
+    topRow: {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "flex-start",
-        marginBottom: "20px",
+        marginBottom: "24px",
     },
+    titleBlock: {},
     eyebrow: {
         fontSize: "11px",
         fontWeight: "500",
         letterSpacing: "0.1em",
         textTransform: "uppercase",
         color: "var(--text-muted)",
-        marginBottom: "4px",
+        marginBottom: "6px",
     },
     title: {
-        fontSize: "22px",
         fontFamily: "var(--font-serif)",
+        fontSize: "24px",
         fontWeight: "400",
+        letterSpacing: "-0.02em",
         color: "var(--text-primary)",
     },
-    scoreRing: {
+    scoreBadge: {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        background: "var(--bg)",
-        border: "1px solid var(--border-light)",
-        borderRadius: "var(--radius)",
-        padding: "12px 20px",
-        minWidth: "80px",
+        border: "1.5px solid",
+        borderRadius: "var(--radius-sm)",
+        padding: "12px 18px",
+        minWidth: "72px",
+        gap: "2px",
     },
-    scoreNumber: {
-        fontSize: "32px",
+    scoreNum: {
         fontFamily: "var(--font-serif)",
+        fontSize: "30px",
         lineHeight: "1",
+        fontWeight: "400",
     },
-    scoreDenom: {
-        fontSize: "12px",
-        color: "var(--text-muted)",
-        marginBottom: "4px",
-    },
-    scoreLabel: {
+    scoreSuffix: {
         fontSize: "11px",
-        fontWeight: "500",
-        letterSpacing: "0.06em",
+        color: "var(--text-muted)",
+    },
+    scoreTag: {
+        fontSize: "10px",
+        fontWeight: "600",
+        letterSpacing: "0.08em",
         textTransform: "uppercase",
+        marginTop: "2px",
     },
     summary: {
         fontSize: "15px",
         color: "var(--text-secondary)",
-        lineHeight: "1.7",
-        padding: "16px 20px",
-        background: "var(--bg)",
-        borderRadius: "var(--radius-sm)",
+        lineHeight: "1.75",
         marginBottom: "28px",
-        borderLeft: "3px solid var(--border)",
     },
-    grid: {
+    divider: {
+        height: "1px",
+        background: "var(--border-light)",
+        marginBottom: "28px",
+    },
+    cols: {
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-        gap: "24px",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: "32px",
     },
-    section: {},
-    sectionTitle: {
+};
+
+const colStyles = {
+    col: {},
+    title: {
         fontSize: "11px",
-        fontWeight: "500",
+        fontWeight: "600",
         letterSpacing: "0.08em",
         textTransform: "uppercase",
         color: "var(--text-muted)",
-        marginBottom: "12px",
+        marginBottom: "14px",
     },
     list: {
         listStyle: "none",
         display: "flex",
         flexDirection: "column",
-        gap: "10px",
+        gap: "12px",
     },
-    listItem: {
+    item: {
         display: "flex",
+        gap: "10px",
         alignItems: "flex-start",
-        gap: "10px",
     },
-    bullet: {
-        flexShrink: 0,
-        width: "22px",
-        height: "22px",
-        borderRadius: "50%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "11px",
+    marker: {
+        fontSize: "13px",
         fontWeight: "700",
+        flexShrink: 0,
         marginTop: "1px",
+        width: "14px",
     },
-    itemText: {
-        fontSize: "14px",
+    text: {
+        fontSize: "13px",
         color: "var(--text-primary)",
-        lineHeight: "1.55",
+        lineHeight: "1.6",
     },
 };
